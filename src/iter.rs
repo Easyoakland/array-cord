@@ -85,6 +85,46 @@ where
         )?;
         Some(self.current.clone())
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        fn op2(
+            sh1: (usize, Option<usize>),
+            sh2: (usize, Option<usize>),
+            mut op: impl FnMut(usize, usize) -> usize,
+        ) -> (usize, Option<usize>) {
+            (op(sh1.0, sh2.0), sh1.1.zip(sh2.1).map(|x| op(x.0, x.1)))
+        }
+        fn iter_to_array<I: Iterator, const N: usize>(mut it: I) -> [I::Item; N] {
+            array::from_fn(|_| it.next().expect("len match"))
+        }
+
+        if N == 0 {
+            return (0, Some(0));
+        }
+
+        let original_size_hints: [_; N] =
+            iter_to_array(self.original_iters.iter().map(|x| x.size_hint()));
+        let next_size_hints: [_; N] =
+            iter_to_array(self.next_val_iters.iter().map(|x| x.size_hint()));
+        let weights: [_; N] = {
+            let mut weights: [_; N] = array::from_fn(|_| (0, None));
+            weights[N - 1] = (1, Some(1));
+            for i in (0..(N - 1)).rev() {
+                weights[i] = op2(
+                    weights[i + 1],
+                    original_size_hints[i + 1],
+                    usize::saturating_mul,
+                )
+            }
+            weights
+        };
+        next_size_hints
+            .into_iter()
+            .zip(weights.into_iter())
+            .map(|(val, weight)| op2(val, weight, usize::saturating_mul))
+            .reduce(|sh1, sh2| op2(sh1, sh2, usize::saturating_add))
+            .expect("nonempty")
+    }
 }
 
 /// Iterator over the moore neighborhood centered at some cord.
@@ -146,4 +186,48 @@ where
     I: Iterator<Item = Cord<T, DIM>>,
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
 {
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NDCartesianProduct;
+    use core::array;
+
+    #[test]
+    fn ndcord_size_hint() {
+        fn test_it(mut it: impl Iterator + Clone) {
+            for _ in 0..=u8::MAX {
+                let count = it.clone().count();
+                assert!(it.size_hint().0 <= count);
+                assert!(it.size_hint().1.unwrap() >= count);
+                it.next();
+            }
+        }
+        test_it(NDCartesianProduct::new([0..2, 0..3, 0..4]));
+        let filter = |x: &i32| *x % 2 == 0;
+        test_it(NDCartesianProduct::new([
+            (0..2).filter(filter),
+            (0..3).filter(filter),
+            (0..4).filter(filter),
+        ]));
+        let map = |_| "";
+        test_it(NDCartesianProduct::new([
+            (0..2).map(map),
+            (0..3).map(map),
+            (0..4).map(map),
+        ]));
+    }
+
+    #[test]
+    fn ndcord_size_hint_inf() {
+        let its: [_; 1] = array::from_fn(|_| core::iter::repeat(0));
+        let nd = NDCartesianProduct::new(its);
+        assert_eq!(nd.size_hint().0, usize::MAX);
+        assert_eq!(nd.size_hint().1, None);
+
+        let its: [_; 0] = array::from_fn(|_| core::iter::repeat(0));
+        let nd = NDCartesianProduct::new(its);
+        assert_eq!(nd.size_hint().0, 0);
+        assert_eq!(nd.size_hint().1, Some(0));
+    }
 }
