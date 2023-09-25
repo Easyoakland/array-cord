@@ -40,9 +40,12 @@ impl<T: Display, const DIM: usize> Display for Cord<T, DIM> {
     }
 }
 
-impl<T: Default + Copy, const DIM: usize> Default for Cord<T, DIM> {
+impl<T, const DIM: usize> Default for Cord<T, DIM>
+where
+    [T; DIM]: Default,
+{
     fn default() -> Self {
-        Self([Default::default(); DIM])
+        Self(Default::default())
     }
 }
 
