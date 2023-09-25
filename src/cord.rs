@@ -1,6 +1,6 @@
-use crate::iter::NDCartesianProduct;
+use crate::iter::{MooreNeighborhoodIterator, NDCartesianProduct};
 use num_iter::range_inclusive;
-use num_traits::{cast, NumCast, One, ToPrimitive, Zero};
+use num_traits::{One, ToPrimitive, Zero};
 use std::{
     array,
     clone::Clone,
@@ -126,55 +126,6 @@ where
     }
 }
 
-/// Iterator over the moore neighborhood centered at some cord.
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-#[derive(Clone, Debug)]
-pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
-    iterator: I,
-    cord: Cord<T, DIM>,
-    radius: usize,
-}
-
-impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIterator<I, T, DIM>
-where
-    I: Iterator<Item = Cord<T, DIM>>,
-    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + NumCast,
-{
-    type Item = Cord<T, DIM>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Each radius increases number of cells in each dimension by 2 (each extent direction by 1) starting with 1 cell at radius = 1.
-        while let Some(cord_offset) = self.iterator.next() {
-            let smallest_neighbor = Cord(self.cord.0.clone().map(|x| {
-                x - cast(self.radius).expect("Can't cast the radius to cord's datatype.")
-            }));
-            let new_cord = smallest_neighbor + cord_offset;
-
-            // Don't add self to neighbor list.
-            if new_cord == self.cord {
-                continue;
-            }
-
-            return Some(new_cord);
-        }
-        None
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let sidelength = self.radius + 1 + self.radius;
-        let volume = (0..DIM).map(|_| sidelength).product::<usize>();
-        // Area or Volume minus the cell the neighborhood is for.
-        (volume - 1, Some(volume - 1))
-    }
-}
-
-impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIterator<I, T, DIM>
-where
-    I: Iterator<Item = Cord<T, DIM>>,
-    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + NumCast,
-{
-}
-
 impl<T, const DIM: usize> Cord<T, DIM> {
     pub fn apply<O>(self, other: Self, func: impl Fn(T, T) -> O) -> Cord<O, DIM> {
         let mut other = other.0.into_iter();
@@ -195,37 +146,29 @@ impl<T, const DIM: usize> Cord<T, DIM> {
     /// Moore neighborhood is a square formed by the extents of the Neumann neighborhood.
     pub fn moore_neighborhood(
         &self,
-        radius: usize,
+        radius: T,
     ) -> MooreNeighborhoodIterator<impl Iterator<Item = Cord<T, DIM>> + Clone, T, DIM>
     where
-        T: Add<Output = T> + PartialOrd + Clone + NumCast + Zero + One,
+        T: Add<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One,
     {
-        let dim_max = cast::<usize, T>(radius + radius)
-            .expect("Can't convert radius + radius into cord's datatype.");
+        let dim_max = radius.clone() + radius.clone();
 
         let iterator = NDCartesianProduct::new(array::from_fn(|_| {
             range_inclusive(Zero::zero(), dim_max.clone())
         }))
         .map(Cord);
 
-        MooreNeighborhoodIterator {
-            iterator,
-            cord: self.clone(),
-            radius,
-        }
+        MooreNeighborhoodIterator::new(iterator, self.clone(), radius)
     }
 
     /// Radius is manhattan distance of furthest neighbors.
     /// Neumann neighborhood is all cells a manhattan distance of the radius or smaller.
-    pub fn neumann_neighborhood(&self, radius: usize) -> impl Iterator<Item = Cord<T, DIM>> + '_
+    pub fn neumann_neighborhood(&self, radius: T) -> impl Iterator<Item = Cord<T, DIM>> + '_
     where
-        T: Sub<Output = T> + Sum + PartialOrd + Clone + NumCast + Zero + One,
+        T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One,
     {
-        let neighbors = self.moore_neighborhood(radius);
-        neighbors.filter(move |x| {
-            x.clone().manhattan_distance(self)
-                <= cast(radius).expect("Can't convert radius to cord's datatype.")
-        })
+        self.moore_neighborhood(radius.clone())
+            .filter(move |x| x.clone().manhattan_distance(self) <= radius)
     }
 
     /// Return an iterator over all points (inclusive) between `self` and `other`. Order is lexicographical.

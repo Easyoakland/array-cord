@@ -1,4 +1,9 @@
-use std::array;
+use crate::cord::Cord;
+use num_traits::ToPrimitive;
+use std::{
+    array,
+    ops::{Add, Sub},
+};
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const N: usize, I>(
@@ -80,4 +85,62 @@ where
         )?;
         Some(self.current.clone())
     }
+}
+
+/// Iterator over the moore neighborhood centered at some cord.
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Clone, Debug)]
+pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
+    iterator: I,
+    cord: Cord<T, DIM>,
+    radius: T,
+}
+
+impl<I, T, const DIM: usize> MooreNeighborhoodIterator<I, T, DIM> {
+    pub fn new(iterator: I, cord: Cord<T, DIM>, radius: T) -> Self {
+        Self {
+            iterator,
+            cord,
+            radius,
+        }
+    }
+}
+
+impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIterator<I, T, DIM>
+where
+    I: Iterator<Item = Cord<T, DIM>>,
+    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
+{
+    type Item = Cord<T, DIM>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Each radius increases number of cells in each dimension by 2 (each extent direction by 1) starting with 1 cell at radius = 1.
+        while let Some(cord_offset) = self.iterator.next() {
+            let smallest_neighbor = Cord(self.cord.0.clone().map(|x| x - self.radius.clone()));
+            let new_cord = smallest_neighbor + cord_offset;
+
+            // Don't add self to neighbor list.
+            if new_cord == self.cord {
+                continue;
+            }
+
+            return Some(new_cord);
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let radius = self.radius.to_usize().expect("Can't cast radius to usize");
+        let sidelength = radius + 1 + radius;
+        let volume = (0..DIM).map(|_| sidelength).product::<usize>();
+        // Area or Volume minus the cell the neighborhood is for.
+        (volume - 1, Some(volume - 1))
+    }
+}
+
+impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIterator<I, T, DIM>
+where
+    I: Iterator<Item = Cord<T, DIM>>,
+    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
+{
 }
