@@ -11,7 +11,7 @@ use core::{
 use num_iter::range_inclusive;
 use num_traits::{One, ToPrimitive, Zero};
 
-/// Newtype on n dimensional arrays representing coordinates in a grid-like space.
+/// Newtype on n dimensional arrays representing coordinates.
 ///
 /// Capable of things like neighborhood calculation, cordinate addition, interpolation, etc...
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -136,13 +136,15 @@ where
 }
 
 impl<T, const DIM: usize> Cord<T, DIM> {
-    pub fn apply<O>(self, other: Self, func: impl Fn(T, T) -> O) -> Cord<O, DIM> {
+    /// Elementwise application of a function on two `Cord`
+    pub fn apply<O>(self, other: Self, mut func: impl FnMut(T, T) -> O) -> Cord<O, DIM> {
         let mut other = other.0.into_iter();
         Cord(
             self.0
                 .map(|x| func(x, other.next().expect("Same length arrays"))),
         )
     }
+
     pub fn manhattan_distance(self, other: &Self) -> T
     where
         T: Sum + Sub<Output = T> + PartialOrd + Clone,
@@ -213,7 +215,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         (smallest.into(), largest.into())
     }
 
-    /// Finds the overall extents for many [`NDCord`] with [`NDCord::extents`]. Handles empty iterator with [`None`].
+    /// Finds the overall extents for many [`Cord`] with [`Cord::extents`]. Handles empty iterator with [`None`].
     /// # Return
     /// `(min_per_axis, max_per_axis)`
     pub fn extents_iter(mut it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
