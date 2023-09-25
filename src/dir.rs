@@ -77,8 +77,8 @@ pub fn rotate<T: MulAssign + One + Neg<Output = T>>(dir: &mut Velocity<T>, rotat
     dir.0.swap(0, 1);
     match rotation {
         // 1,0 -> 0,1 -> -1,0 -> 0,-1
-        Rotation::Right => dir.0[0] *= -T::one(),
+        Rotation::Right => dir[0] *= -T::one(),
         // 1,0 -> 0,-1 -> -1,0 -> 0,1
-        Rotation::Left => dir.0[1] *= -T::one(),
+        Rotation::Left => dir[1] *= -T::one(),
     }
 }

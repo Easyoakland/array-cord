@@ -6,7 +6,7 @@ use core::{
     fmt::{Debug, Display},
     iter::{Iterator, Sum},
     num::NonZeroUsize,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign},
 };
 use num_iter::range_inclusive;
 use num_traits::{One, ToPrimitive, Zero};
@@ -24,6 +24,20 @@ pub fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
 /// Capable of things like neighborhood calculation, cordinate addition, interpolation, etc...
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Cord<T, const DIM: usize>(pub [T; DIM]);
+
+impl<T, const DIM: usize> Index<usize> for Cord<T, DIM> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.0.index(index)
+    }
+}
+
+impl<T, const DIM: usize> IndexMut<usize> for Cord<T, DIM> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.0.index_mut(index)
+    }
+}
 
 impl<T: Display, const DIM: usize> Display for Cord<T, DIM> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -96,7 +110,7 @@ where
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
-        array::from_fn(|i| self.0[i].clone() * rhs.clone()).into()
+        array::from_fn(|i| self[i].clone() * rhs.clone()).into()
     }
 }
 
@@ -116,7 +130,7 @@ where
     type Output = Self;
 
     fn div(self, rhs: T) -> Self::Output {
-        array::from_fn(|i| self.0[i].clone() / rhs.clone()).into()
+        array::from_fn(|i| self[i].clone() / rhs.clone()).into()
     }
 }
 
@@ -182,8 +196,8 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         // Use min and max so range doesn't silently emit no values (high..low is length 0 range)
         let ranges = array::from_fn(|i| {
             range_inclusive(
-                self.0[i].clone().min(other.0[i].clone()),
-                self.0[i].clone().max(other.0[i].clone()),
+                self[i].clone().min(other[i].clone()),
+                self[i].clone().max(other[i].clone()),
             )
         });
         NDCartesianProduct::new(ranges).map(Cord)
@@ -194,8 +208,8 @@ impl<T, const DIM: usize> Cord<T, DIM> {
     where
         T: Ord + Clone,
     {
-        let smallest = array::from_fn(|axis| self.0[axis].clone().min(other.0[axis].clone()));
-        let largest = array::from_fn(|axis| self.0[axis].clone().max(other.0[axis].clone()));
+        let smallest = array::from_fn(|axis| self[axis].clone().min(other[axis].clone()));
+        let largest = array::from_fn(|axis| self[axis].clone().max(other[axis].clone()));
         (smallest.into(), largest.into())
     }
 
