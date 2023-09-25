@@ -1,9 +1,9 @@
 use crate::cord::Cord;
-use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
-use std::{
+use core::{
     cmp::PartialEq,
     ops::{MulAssign, Neg},
 };
+use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 
 pub type Velocity<T> = Cord<T, 2>;
 

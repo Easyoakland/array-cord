@@ -1,9 +1,9 @@
 use crate::cord::Cord;
-use num_traits::ToPrimitive;
-use std::{
+use core::{
     array,
     ops::{Add, Sub},
 };
+use num_traits::ToPrimitive;
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const N: usize, I>(
@@ -91,8 +91,11 @@ where
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
 pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
+    /// Iterator of cord offsets from the center
     iterator: I,
+    /// The center cordinate
     cord: Cord<T, DIM>,
+    /// The radius used for size_hints
     radius: T,
 }
 

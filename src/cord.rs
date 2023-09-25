@@ -1,7 +1,5 @@
 use crate::iter::{MooreNeighborhoodIterator, NDCartesianProduct};
-use num_iter::range_inclusive;
-use num_traits::{One, ToPrimitive, Zero};
-use std::{
+use core::{
     array,
     clone::Clone,
     cmp::PartialEq,
@@ -10,6 +8,8 @@ use std::{
     num::NonZeroUsize,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
+use num_iter::range_inclusive;
+use num_traits::{One, ToPrimitive, Zero};
 
 pub fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
     if x >= y {
@@ -26,7 +26,7 @@ pub fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
 pub struct Cord<T, const DIM: usize>(pub [T; DIM]);
 
 impl<T: Display, const DIM: usize> Display for Cord<T, DIM> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "[")?;
         if self.0.len() > 0 {
             for e in &self.0[..self.0.len() - 1] {
