@@ -11,14 +11,6 @@ use core::{
 use num_iter::range_inclusive;
 use num_traits::{One, ToPrimitive, Zero};
 
-pub fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
-    if x >= y {
-        x - y
-    } else {
-        y - x
-    }
-}
-
 /// Newtype on n dimensional arrays representing coordinates in a grid-like space.
 ///
 /// Capable of things like neighborhood calculation, cordinate addition, interpolation, etc...
@@ -155,6 +147,14 @@ impl<T, const DIM: usize> Cord<T, DIM> {
     where
         T: Sum + Sub<Output = T> + PartialOrd + Clone,
     {
+        fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
+            if x >= y {
+                x - y
+            } else {
+                y - x
+            }
+        }
+
         let diff_per_axis = self.apply(other.clone(), abs_diff::<T>);
         diff_per_axis.0.into_iter().sum()
     }
