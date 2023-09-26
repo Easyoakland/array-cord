@@ -132,7 +132,7 @@ where
 /// Iterator over the moore neighborhood centered at some [`Cord`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
-pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
+pub(crate) struct MooreNeighborhoodIter<I, T, const DIM: usize> {
     /// Iterator of cord offsets from the center
     iterator: I,
     /// The center cordinate
@@ -141,7 +141,8 @@ pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
     radius: T,
 }
 
-impl<I, T, const DIM: usize> MooreNeighborhoodIterator<I, T, DIM> {
+impl<I, T, const DIM: usize> MooreNeighborhoodIter<I, T, DIM> {
+    /// Create new moore neighborhood iterator given an iterator of offsets, a center cord, and a radius.
     pub const fn new(iterator: I, cord: Cord<T, DIM>, radius: T) -> Self {
         Self {
             iterator,
@@ -151,7 +152,7 @@ impl<I, T, const DIM: usize> MooreNeighborhoodIterator<I, T, DIM> {
     }
 }
 
-impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIterator<I, T, DIM>
+impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIter<I, T, DIM>
 where
     I: Iterator<Item = Cord<T, DIM>>,
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
@@ -183,7 +184,7 @@ where
     }
 }
 
-impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIterator<I, T, DIM>
+impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<I, T, DIM>
 where
     I: Iterator<Item = Cord<T, DIM>>,
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,

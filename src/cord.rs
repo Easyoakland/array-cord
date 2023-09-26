@@ -1,4 +1,4 @@
-use crate::iter::{CartesianProduct, MooreNeighborhoodIterator};
+use crate::iter::{CartesianProduct, MooreNeighborhoodIter};
 use core::{
     array,
     clone::Clone,
@@ -185,7 +185,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         }))
         .map(Cord);
 
-        MooreNeighborhoodIterator::new(iterator, self.clone(), radius)
+        MooreNeighborhoodIter::new(iterator, self.clone(), radius)
     }
 
     /// All [`Cord`] with a manhattan distance <= `radius` from the center or less not including the center.
