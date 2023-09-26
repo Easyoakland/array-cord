@@ -34,7 +34,7 @@ where
 /// Cartesian product in lexicographical order over `N` iterators.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
-pub struct NDCartesianProduct<I, const N: usize>
+pub struct CartesianProduct<I, const N: usize>
 where
     I: Iterator,
 {
@@ -43,7 +43,7 @@ where
     current: [I::Item; N],
 }
 
-impl<I, const N: usize> NDCartesianProduct<I, N>
+impl<I, const N: usize> CartesianProduct<I, N>
 where
     I: Iterator + Clone,
 {
@@ -72,7 +72,7 @@ where
     }
 }
 
-impl<I, const N: usize> Iterator for NDCartesianProduct<I, N>
+impl<I, const N: usize> Iterator for CartesianProduct<I, N>
 where
     I: Iterator + Clone,
     I::Item: Clone,
@@ -192,11 +192,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::NDCartesianProduct;
+    use super::CartesianProduct;
     use core::array;
 
     #[test]
-    fn ndcord_size_hint() {
+    fn cartesian_product_cord_size_hint() {
         fn test_it(mut it: impl Iterator + Clone) {
             for _ in 0..=u8::MAX {
                 let count = it.clone().count();
@@ -205,15 +205,15 @@ mod tests {
                 it.next();
             }
         }
-        test_it(NDCartesianProduct::new([0..2, 0..3, 0..4]));
+        test_it(CartesianProduct::new([0..2, 0..3, 0..4]));
         let filter = |x: &i32| *x % 2 == 0;
-        test_it(NDCartesianProduct::new([
+        test_it(CartesianProduct::new([
             (0..2).filter(filter),
             (0..3).filter(filter),
             (0..4).filter(filter),
         ]));
         let map = |_| "";
-        test_it(NDCartesianProduct::new([
+        test_it(CartesianProduct::new([
             (0..2).map(map),
             (0..3).map(map),
             (0..4).map(map),
@@ -221,14 +221,14 @@ mod tests {
     }
 
     #[test]
-    fn ndcord_size_hint_inf() {
+    fn cartesian_product_size_hint_inf() {
         let its: [_; 1] = array::from_fn(|_| core::iter::repeat(0));
-        let nd = NDCartesianProduct::new(its);
+        let nd = CartesianProduct::new(its);
         assert_eq!(nd.size_hint().0, usize::MAX);
         assert_eq!(nd.size_hint().1, None);
 
         let its: [_; 0] = array::from_fn(|_| core::iter::repeat(0));
-        let nd = NDCartesianProduct::new(its);
+        let nd = CartesianProduct::new(its);
         assert_eq!(nd.size_hint().0, 0);
         assert_eq!(nd.size_hint().1, Some(0));
     }

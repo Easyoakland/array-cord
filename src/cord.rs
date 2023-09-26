@@ -1,4 +1,4 @@
-use crate::iter::{MooreNeighborhoodIterator, NDCartesianProduct};
+use crate::iter::{CartesianProduct, MooreNeighborhoodIterator};
 use core::{
     array,
     clone::Clone,
@@ -180,7 +180,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
     {
         let dim_max = radius.clone() + radius.clone();
 
-        let iterator = NDCartesianProduct::new(array::from_fn(|_| {
+        let iterator = CartesianProduct::new(array::from_fn(|_| {
             range_inclusive(Zero::zero(), dim_max.clone())
         }))
         .map(Cord);
@@ -216,7 +216,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
                 self[i].clone().max(other[i].clone()),
             )
         });
-        NDCartesianProduct::new(ranges).map(Cord)
+        CartesianProduct::new(ranges).map(Cord)
     }
 
     /// Finds the largest value in each dimension and smallest value in each dimension as the pair `(min, max)`.
