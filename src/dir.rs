@@ -29,6 +29,8 @@ pub enum Dir {
 }
 
 impl Dir {
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // doesn't panic
     pub fn rotate(self, rotation: &Rotation) -> Self {
         match rotation {
             Rotation::Right => Self::from_i8((self.to_i8().unwrap() + 1).rem_euclid(4)).unwrap(),
@@ -37,6 +39,7 @@ impl Dir {
     }
 
     /// Converts the direction to velocity with the assumption that Right is increasing x and Down is increasing y (and vice versa).
+    #[must_use]
     pub fn to_velocity<T>(self) -> Velocity<T>
     where
         T: Zero + One + Neg<Output = T>,
@@ -52,14 +55,17 @@ impl Dir {
 
     /// Converts from a velocity to direction with the assumption that Right is increasing x and Down is increasing y (and vice versa).
     /// Additionally assumes that velocity has a magnitude of `1` or `0` in each dimension.
+    ///
+    /// # Panics
+    /// - velocity is not `[1,0]` rotated by some `n pi/2` amount.
     pub fn from_velocity<T: Zero + One + Neg<Output = T> + PartialEq>(
         velocity: Velocity<T>,
     ) -> Self {
         match velocity.0 {
-            x if x == [T::one(), T::zero()] => Dir::Right,
-            x if x == [T::zero(), T::one()] => Dir::Down,
-            x if x == [-T::one(), T::zero()] => Dir::Left,
-            x if x == [T::zero(), -T::one()] => Dir::Up,
+            x if x == [T::one(), T::zero()] => Self::Right,
+            x if x == [T::zero(), T::one()] => Self::Down,
+            x if x == [-T::one(), T::zero()] => Self::Left,
+            x if x == [T::zero(), -T::one()] => Self::Up,
             _ => panic!("Invalid velocity"),
         }
     }

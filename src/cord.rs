@@ -34,9 +34,9 @@ impl<T, const DIM: usize> IndexMut<usize> for Cord<T, DIM> {
 impl<T: Display, const DIM: usize> Display for Cord<T, DIM> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "[")?;
-        if self.0.len() > 0 {
+        if !self.0.is_empty() {
             for e in &self.0[..self.0.len() - 1] {
-                write!(f, "{}, ", e)?;
+                write!(f, "{e}, ")?;
             }
             {
                 write!(f, "{}", self.0.last().unwrap())?;
@@ -91,7 +91,7 @@ where
     T: Sub<Output = T> + Clone,
 {
     fn sub_assign(&mut self, rhs: Self) {
-        *self = self.clone() - rhs
+        *self = self.clone() - rhs;
     }
 }
 
@@ -111,7 +111,7 @@ where
     T: Mul<Output = T> + Clone,
 {
     fn mul_assign(&mut self, rhs: T) {
-        *self = self.clone() * rhs
+        *self = self.clone() * rhs;
     }
 }
 
@@ -131,12 +131,13 @@ where
     T: Div<Output = T> + Clone,
 {
     fn div_assign(&mut self, rhs: T) {
-        *self = self.clone() / rhs
+        *self = self.clone() / rhs;
     }
 }
 
 impl<T, const DIM: usize> Cord<T, DIM> {
     /// Elementwise application of a function on two `Cord`
+    #[allow(clippy::missing_panics_doc)] // doesn't panic
     pub fn apply<O>(self, other: Self, mut func: impl FnMut(T, T) -> O) -> Cord<O, DIM> {
         let mut other = other.0.into_iter();
         Cord(
@@ -145,6 +146,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         )
     }
 
+    /// The number of orthogonal moves to reach `other` from `self`.
     pub fn manhattan_distance(self, other: &Self) -> T
     where
         T: Sum + Sub<Output = T> + PartialOrd + Clone,
@@ -161,14 +163,20 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         diff_per_axis.0.into_iter().sum()
     }
 
-    /// Radius is manhattan distance from center to edge.
-    /// Moore neighborhood is a square formed by the extents of the Neumann neighborhood.
+    /// The square formed by the extents of the `neumann_neighborhood` not including the center.
+    ///
+    /// e.g. with radius `1`:
+    /// ```
+    /// x x x
+    /// x c x
+    /// x x x
+    /// ```
     pub fn moore_neighborhood(
         &self,
         radius: T,
-    ) -> MooreNeighborhoodIterator<impl Iterator<Item = Cord<T, DIM>> + Clone, T, DIM>
+    ) -> impl ExactSizeIterator<Item = Cord<T, DIM>> + Clone
     where
-        T: Add<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One,
+        T: Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One,
     {
         let dim_max = radius.clone() + radius.clone();
 
@@ -180,9 +188,15 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         MooreNeighborhoodIterator::new(iterator, self.clone(), radius)
     }
 
-    /// Radius is manhattan distance of furthest neighbors.
-    /// Neumann neighborhood is all cells a manhattan distance of the radius or smaller.
-    pub fn neumann_neighborhood(&self, radius: T) -> impl Iterator<Item = Cord<T, DIM>> + '_
+    /// All [`Cord`] with a manhattan distance <= `radius` from the center or less not including the center.
+    ///
+    /// e.g. with radius `1`:
+    /// ```
+    ///   x
+    /// x c x
+    ///   x
+    /// ```
+    pub fn neumann_neighborhood(&self, radius: T) -> impl Iterator<Item = Cord<T, DIM>> + Clone + '_
     where
         T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One,
     {
@@ -215,7 +229,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
         (smallest.into(), largest.into())
     }
 
-    /// Finds the overall extents for many [`Cord`] with [`Cord::extents`]. Handles empty iterator with [`None`].
+    /// Finds the overall extents for many [`Cord`] using [`Cord::extents`]. Handles empty iterator with [`None`].
     /// # Return
     /// `(min_per_axis, max_per_axis)`
     pub fn extents_iter(mut it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
@@ -229,7 +243,7 @@ impl<T, const DIM: usize> Cord<T, DIM> {
     }
 
     /// Find the cordinate that coresponds to a given offset where maximum width of each axis is given.
-    /// Fills values of coordinates from greatest index to least.
+    /// Lower axis idx increment before higher axis idx.
     /// ```
     /// # use ndcord::cord::Cord;
     /// # use core::num::NonZeroUsize;

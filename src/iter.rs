@@ -31,7 +31,7 @@ where
     None
 }
 
-/// Cartesian product in lexicographical order over N iterators.
+/// Cartesian product in lexicographical order over `N` iterators.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
 pub struct NDCartesianProduct<I, const N: usize>
@@ -47,6 +47,8 @@ impl<I, const N: usize> NDCartesianProduct<I, N>
 where
     I: Iterator + Clone,
 {
+    /// # Panics
+    /// - If an axis has 0 valid values
     pub fn new(mut values_per_axis: [I; N]) -> Self {
         let original_iters = values_per_axis.clone();
         // The length of current is N and so is values per axis. This unwrap should thus never fail unless an empty iterator is used.
@@ -62,7 +64,7 @@ where
             *x = y.clone();
         }
 
-        NDCartesianProduct {
+        Self {
             original_iters,
             next_val_iters: values_per_axis,
             current,
@@ -70,7 +72,7 @@ where
     }
 }
 
-impl<I: Iterator + Clone, const N: usize> Iterator for NDCartesianProduct<I, N>
+impl<I, const N: usize> Iterator for NDCartesianProduct<I, N>
 where
     I: Iterator + Clone,
     I::Item: Clone,
@@ -103,9 +105,9 @@ where
         }
 
         let original_size_hints: [_; N] =
-            iter_to_array(self.original_iters.iter().map(|x| x.size_hint()));
+            iter_to_array(self.original_iters.iter().map(Iterator::size_hint));
         let next_size_hints: [_; N] =
-            iter_to_array(self.next_val_iters.iter().map(|x| x.size_hint()));
+            iter_to_array(self.next_val_iters.iter().map(Iterator::size_hint));
         let weights: [_; N] = {
             let mut weights: [_; N] = array::from_fn(|_| (0, None));
             weights[N - 1] = (1, Some(1));
@@ -114,20 +116,20 @@ where
                     weights[i + 1],
                     original_size_hints[i + 1],
                     usize::saturating_mul,
-                )
+                );
             }
             weights
         };
         next_size_hints
             .into_iter()
-            .zip(weights.into_iter())
+            .zip(weights)
             .map(|(val, weight)| op2(val, weight, usize::saturating_mul))
             .reduce(|sh1, sh2| op2(sh1, sh2, usize::saturating_add))
             .expect("nonempty")
     }
 }
 
-/// Iterator over the moore neighborhood centered at some cord.
+/// Iterator over the moore neighborhood centered at some [`Cord`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
 pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
@@ -140,7 +142,7 @@ pub struct MooreNeighborhoodIterator<I, T, const DIM: usize> {
 }
 
 impl<I, T, const DIM: usize> MooreNeighborhoodIterator<I, T, DIM> {
-    pub fn new(iterator: I, cord: Cord<T, DIM>, radius: T) -> Self {
+    pub const fn new(iterator: I, cord: Cord<T, DIM>, radius: T) -> Self {
         Self {
             iterator,
             cord,
