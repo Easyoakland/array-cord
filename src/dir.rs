@@ -3,24 +3,12 @@ use core::{
     cmp::PartialEq,
     ops::{MulAssign, Neg},
 };
-use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
+use num_traits::{One, Zero};
 
 pub type Velocity<T> = Cord<T, 2>;
 
-// Direction where the discriminant represents the number of clockwise turns from the right.
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    num_derive::FromPrimitive,
-    num_derive::ToPrimitive,
-    enum_iterator::Sequence,
-)]
+/// Direction where the discriminant represents the number of clockwise turns from the right.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, enum_iterator::Sequence)]
 pub enum Dir {
     Right = 0,
     Down = 1,
@@ -31,10 +19,10 @@ pub enum Dir {
 impl Dir {
     #[must_use]
     #[allow(clippy::missing_panics_doc)] // doesn't panic
-    pub fn rotate(self, rotation: &Rotation) -> Self {
+    pub fn rotate(self, rotation: Rotation) -> Self {
         match rotation {
-            Rotation::Right => Self::from_i8((self.to_i8().unwrap() + 1).rem_euclid(4)).unwrap(),
-            Rotation::Left => Self::from_i8((self.to_i8().unwrap() - 1).rem_euclid(4)).unwrap(),
+            Rotation::Right => enum_iterator::next_cycle(&self).expect(">0 variants"),
+            Rotation::Left => enum_iterator::previous_cycle(&self).expect(">0 variants"),
         }
     }
 
@@ -57,7 +45,7 @@ impl Dir {
     /// Additionally assumes that velocity has a magnitude of `1` or `0` in each dimension.
     ///
     /// # Panics
-    /// - velocity is not `[1,0]` rotated by some `n pi/2` amount.
+    /// - velocity is not `[1,0]` rotated by some integer multiple of `pi/2` amount.
     pub fn from_velocity<T: Zero + One + Neg<Output = T> + PartialEq>(
         velocity: Velocity<T>,
     ) -> Self {
@@ -86,5 +74,23 @@ pub fn rotate<T: MulAssign + One + Neg<Output = T>>(dir: &mut Velocity<T>, rotat
         Rotation::Right => dir[0] *= -T::one(),
         // 1,0 -> 0,-1 -> -1,0 -> 0,1
         Rotation::Left => dir[1] *= -T::one(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Dir, Rotation};
+
+    #[test]
+    fn direction_rotation() {
+        assert_eq!(Dir::Right.rotate(Rotation::Right), Dir::Down);
+        assert_eq!(Dir::Down.rotate(Rotation::Right), Dir::Left);
+        assert_eq!(Dir::Left.rotate(Rotation::Right), Dir::Up);
+        assert_eq!(Dir::Up.rotate(Rotation::Right), Dir::Right);
+
+        assert_eq!(Dir::Right.rotate(Rotation::Left), Dir::Up);
+        assert_eq!(Dir::Up.rotate(Rotation::Left), Dir::Left);
+        assert_eq!(Dir::Left.rotate(Rotation::Left), Dir::Down);
+        assert_eq!(Dir::Down.rotate(Rotation::Left), Dir::Right);
     }
 }
