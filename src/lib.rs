@@ -1,4 +1,4 @@
-// #![cfg_attr(not(feature = "std"), no_std)] // TODO re-add after removing Box
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(clippy::all)]
 #![warn(
     // TODO activate this // missing_docs,

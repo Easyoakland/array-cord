@@ -53,7 +53,7 @@ where
         T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One;
 
     /// Return an iterator over all points (inclusive) between `self` and `other`. Order is lexicographical.
-    fn interpolate(&self, other: &Self) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
+    fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
     where
         T: Add<Output = T> + Ord + Clone + One + ToPrimitive;
 
@@ -135,7 +135,7 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
         }
     }
 
-    fn interpolate(&self, other: &Self) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
+    fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
     where
         T: Add<Output = T> + Ord + Clone + One + ToPrimitive,
     {
@@ -146,7 +146,7 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
                 self[i].clone().max(other[i].clone()),
             )
         });
-        Box::new(CartesianProduct::new(ranges))
+        CartesianProduct::new(ranges)
     }
 
     fn extents(&self, other: &Self) -> (Self, Self)
