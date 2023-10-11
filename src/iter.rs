@@ -4,7 +4,7 @@ use core::{
     ops::{Add, Sub},
 };
 use num_traits::ToPrimitive;
-use std::{clone::Clone, cmp::PartialOrd, fmt::Debug};
+use std::{clone::Clone, cmp::PartialOrd, fmt::Debug, iter::Sum};
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const N: usize, I>(
@@ -127,7 +127,7 @@ where
     }
 }
 
-/// Iterator over the moore neighborhood centered at some [`Cord`].
+/// Iterator over the moore neighborhood centered at some cord.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone)]
 pub struct MooreNeighborhoodIter<T, const DIM: usize>
@@ -194,6 +194,36 @@ where
 impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<T, DIM> where
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd
 {
+}
+
+/// Iterator over the neumann neighborhood centered at some cord.
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Clone, Debug)]
+pub struct NeumannNeighborhoodIter<T, const DIM: usize>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
+{
+    /// Iterator of cord offsets from the center
+    pub(crate) it: MooreNeighborhoodIter<T, DIM>,
+}
+
+impl<T, const DIM: usize> Iterator for NeumannNeighborhoodIter<T, DIM>
+where
+    T: Add<Output = T> + Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Sum,
+{
+    type Item = [T; DIM];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(next) = self.it.next() {
+            if next.clone().manhattan_distance(&self.it.cord) <= self.it.radius {
+                return Some(next);
+            }
+        }
+        None
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.it.size_hint().1)
+    }
 }
 
 #[cfg(test)]

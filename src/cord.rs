@@ -1,4 +1,4 @@
-use crate::iter::{CartesianProduct, MooreNeighborhoodIter};
+use crate::iter::{CartesianProduct, MooreNeighborhoodIter, NeumannNeighborhoodIter};
 use core::{
     array,
     clone::Clone,
@@ -40,7 +40,7 @@ where
     where
         T: Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One;
 
-    /// All [`Cord`] with a manhattan distance <= `radius` from the center or less not including the center.
+    /// All cord with a manhattan distance <= `radius` from the center or less not including the center.
     ///
     /// e.g. with radius `1`:
     /// ```txt
@@ -48,7 +48,7 @@ where
     /// x c x
     ///   x
     /// ```
-    fn neumann_neighborhood<'a>(&'a self, radius: T) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
+    fn neumann_neighborhood<'a>(&'a self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One;
 
@@ -62,7 +62,7 @@ where
     where
         T: Ord + Clone;
 
-    /// Finds the overall extents for many [`Cord`] using [`Cord::extents`]. Handles empty iterator with [`None`].
+    /// Finds the overall extents for many cord using [`extents`]. Handles empty iterator with [`None`].
     /// # Return
     /// `(min_per_axis, max_per_axis)`
     fn extents_iter(it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
@@ -126,14 +126,13 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
         }
     }
 
-    fn neumann_neighborhood(&self, radius: T) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
+    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One,
     {
-        Box::new(
-            self.moore_neighborhood(radius.clone())
-                .filter(move |x| x.clone().manhattan_distance(self) <= radius),
-        )
+        NeumannNeighborhoodIter {
+            it: self.moore_neighborhood(radius),
+        }
     }
 
     fn interpolate(&self, other: &Self) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
