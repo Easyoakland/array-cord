@@ -13,11 +13,47 @@ pub trait ArrayExt<T, const DIM: usize>
 where
     Self: Sized,
 {
+    /// Make an array from an iterator of values.
+    /// # Panics
+    /// If there are not `DIM` number of [`Some`] elements from iterator
     fn from_iter<I: Iterator>(mut it: I) -> [I::Item; DIM] {
         array::from_fn(|_| {
             it.next()
                 .expect("iterator length should match array length")
         })
+    }
+
+    /// Find the cordinate that coresponds to a given offset where maximum width of each axis is given.
+    /// Lower axis idx increment before higher axis idx.
+    /// ```
+    /// # use ndcord::cord::ArrayExt;
+    /// # use core::num::NonZeroUsize;
+    /// // x x
+    /// // x x
+    /// // x x
+    /// let widths = [2, 3].map(|x| NonZeroUsize::new(x).unwrap());
+    /// assert_eq!(<[usize; 2]>::from_offset(0, widths), [0, 0]);
+    /// assert_eq!(<[usize; 2]>::from_offset(1, widths), [1, 0]);
+    /// assert_eq!(<[usize; 2]>::from_offset(2, widths), [0, 1]);
+    /// assert_eq!(<[usize; 2]>::from_offset(3, widths), [1, 1]);
+    /// assert_eq!(<[usize; 2]>::from_offset(4, widths), [0, 2]);
+    /// ```
+    fn from_offset(mut offset: usize, widths: [NonZeroUsize; DIM]) -> [T; DIM]
+    where
+        T: From<usize>,
+    {
+        let mut out = [0; DIM];
+        for axis in (0..DIM).rev() {
+            let next_lowest_axis_width = axis.checked_sub(1);
+            out[axis] = match next_lowest_axis_width {
+                Some(x) => offset / widths[x],
+                None => offset,
+            };
+            if next_lowest_axis_width.is_some() {
+                offset -= out[axis] * <usize as From<_>>::from(widths[axis - 1]);
+            }
+        }
+        out.map(Into::into).into()
     }
 
     /// Elementwise application of a function on two arrays
@@ -38,7 +74,7 @@ where
     /// ```
     fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
     where
-        T: Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One;
+        T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
 
     /// All cord with a manhattan distance <= `radius` from the center or less not including the center.
     ///
@@ -50,7 +86,7 @@ where
     /// ```
     fn neumann_neighborhood<'a>(&'a self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
     where
-        T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One;
+        T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One;
 
     /// Return an iterator over all points (inclusive) between `self` and `other`. Order is lexicographical.
     fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
@@ -68,85 +104,10 @@ where
     fn extents_iter(it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
     where
         T: Ord + Clone;
-
-    /// Find the cordinate that coresponds to a given offset where maximum width of each axis is given.
-    /// Lower axis idx increment before higher axis idx.
-    /// ```
-    /// # use ndcord::cord::ArrayExt;
-    /// # use core::num::NonZeroUsize;
-    /// // x x
-    /// // x x
-    /// // x x
-    /// let widths = [2, 3].map(|x| NonZeroUsize::new(x).unwrap());
-    /// assert_eq!(<[usize; 2]>::from_offset(0, widths), [0, 0]);
-    /// assert_eq!(<[usize; 2]>::from_offset(1, widths), [1, 0]);
-    /// assert_eq!(<[usize; 2]>::from_offset(2, widths), [0, 1]);
-    /// assert_eq!(<[usize; 2]>::from_offset(3, widths), [1, 1]);
-    /// assert_eq!(<[usize; 2]>::from_offset(4, widths), [0, 2]);
-    /// ```
-    fn from_offset(offset: usize, widths: [NonZeroUsize; DIM]) -> [T; DIM]
-    where
-        T: From<usize>;
 }
 impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
     fn apply<O>(self, other: Self, mut func: impl FnMut(T, T) -> O) -> [O; DIM] {
         Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y)))
-    }
-
-    fn manhattan_distance(self, other: Self) -> T
-    where
-        T: Sum + Sub<Output = T> + PartialOrd + Clone,
-    {
-        fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
-            if x >= y {
-                x - y
-            } else {
-                y - x
-            }
-        }
-
-        let diff_per_axis = self.apply(other, abs_diff::<T>);
-        diff_per_axis.into_iter().sum()
-    }
-
-    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
-    where
-        T: PartialOrd + Clone + ToPrimitive + Zero + One,
-    {
-        let dim_max = radius.clone() + radius.clone();
-
-        let iterator = CartesianProduct::new(array::from_fn(|_| {
-            range_inclusive(Zero::zero(), dim_max.clone())
-        }));
-
-        MooreNeighborhoodIter {
-            iterator,
-            cord: self.clone(),
-            radius,
-        }
-    }
-
-    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
-    where
-        T: Sub<Output = T> + Sum + PartialOrd + Clone + ToPrimitive + Zero + One,
-    {
-        NeumannNeighborhoodIter {
-            it: self.moore_neighborhood(radius),
-        }
-    }
-
-    fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
-    where
-        T: Add<Output = T> + Ord + Clone + One + ToPrimitive,
-    {
-        // Use min and max so range doesn't silently emit no values (high..low is length 0 range)
-        let ranges = array::from_fn(|i| {
-            range_inclusive(
-                self[i].clone().min(other[i].clone()),
-                self[i].clone().max(other[i].clone()),
-            )
-        });
-        CartesianProduct::new(ranges)
     }
 
     fn extents(&self, other: &Self) -> (Self, Self)
@@ -168,22 +129,57 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
         }))
     }
 
-    fn from_offset(mut offset: usize, widths: [NonZeroUsize; DIM]) -> [T; DIM]
+    fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
     where
-        T: From<usize>,
+        T: Add<Output = T> + Ord + Clone + One + ToPrimitive,
     {
-        let mut out = [0; DIM];
-        for axis in (0..DIM).rev() {
-            let next_lowest_axis_width = axis.checked_sub(1);
-            out[axis] = match next_lowest_axis_width {
-                Some(x) => offset / widths[x],
-                None => offset,
-            };
-            if next_lowest_axis_width.is_some() {
-                offset -= out[axis] * <usize as From<_>>::from(widths[axis - 1]);
+        let extents = self.extents(other);
+
+        let ranges = Self::from_iter(
+            core::iter::zip(extents.0, extents.1).map(|x| range_inclusive(x.0, x.1)),
+        );
+        CartesianProduct::new(ranges)
+    }
+
+    fn manhattan_distance(self, other: Self) -> T
+    where
+        T: Sum + Sub<Output = T> + PartialOrd + Clone,
+    {
+        fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
+            if x >= y {
+                x - y
+            } else {
+                y - x
             }
         }
-        out.map(Into::into).into()
+
+        let diff_per_axis = self.apply(other, abs_diff::<T>);
+        diff_per_axis.into_iter().sum()
+    }
+
+    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
+    where
+        T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
+    {
+        let lower_corner = Self::from_iter(self.into_iter().cloned().map(|x| x - radius.clone()));
+        let upper_corner = Self::from_iter(self.into_iter().cloned().map(|x| x + radius.clone()));
+
+        let iterator = lower_corner.interpolate(&upper_corner);
+
+        MooreNeighborhoodIter {
+            iterator,
+            cord: self.clone(),
+            radius,
+        }
+    }
+
+    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
+    where
+        T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One,
+    {
+        NeumannNeighborhoodIter {
+            it: self.moore_neighborhood(radius),
+        }
     }
 }
 
@@ -274,9 +270,14 @@ mod tests {
     fn neumann_neighborhood() {
         let cord = [-8, 4];
         let out = cord.neumann_neighborhood(1);
+        #[rustfmt::skip]
         assert_eq!(
             out.collect::<Vec<_>>(),
-            vec![[-9, 4], [-8, 3], [-8, 5], [-7, 4]]
+            vec![
+                [-9, 4],
+        [-8, 3],         [-8, 5],
+                [-7, 4]
+            ]
         );
 
         let out: Vec<_> = cord.neumann_neighborhood(2).collect();

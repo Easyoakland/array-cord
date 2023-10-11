@@ -134,7 +134,7 @@ pub struct MooreNeighborhoodIter<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
-    /// Iterator of cord offsets from the center
+    /// Iterator of neighbors and self
     pub(crate) iterator: CartesianProduct<num_iter::RangeInclusive<T>, DIM>,
     /// The center cordinate
     pub(crate) cord: [T; DIM],
@@ -162,22 +162,11 @@ where
     type Item = [T; DIM];
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Each radius increases number of cells in each dimension by 2 (each extent direction by 1) starting with 1 cell at radius = 1.
-        while let Some(cord_offset) = self.iterator.next() {
-            let smallest_neighbor = self.cord.clone().map(|x| x - self.radius.clone());
-            let new_cord = <[T; DIM] as ArrayExt<T, DIM>>::from_iter(
-                smallest_neighbor
-                    .into_iter()
-                    .zip(cord_offset)
-                    .map(|(x, y)| x + y),
-            );
-
+        while let Some(neighbor_or_self) = self.iterator.next() {
             // Don't add self to neighbor list.
-            if new_cord.iter().zip(&self.cord).all(|(x, y)| x == y) {
-                continue;
+            if core::iter::zip(&neighbor_or_self, &self.cord).any(|(x, y)| x != y) {
+                return Some(neighbor_or_self);
             }
-
-            return Some(new_cord);
         }
         None
     }
