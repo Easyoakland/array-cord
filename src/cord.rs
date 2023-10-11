@@ -24,7 +24,7 @@ where
     fn apply<O>(self, other: Self, func: impl FnMut(T, T) -> O) -> [O; DIM];
 
     /// The number of orthogonal moves to reach `other` from `self`.
-    fn manhattan_distance(self, other: &Self) -> T
+    fn manhattan_distance(self, other: Self) -> T
     where
         T: Sum + Sub<Output = T> + PartialOrd + Clone;
 
@@ -93,7 +93,7 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
         Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y)))
     }
 
-    fn manhattan_distance(self, other: &Self) -> T
+    fn manhattan_distance(self, other: Self) -> T
     where
         T: Sum + Sub<Output = T> + PartialOrd + Clone,
     {
@@ -105,7 +105,7 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
             }
         }
 
-        let diff_per_axis = self.apply(other.clone(), abs_diff::<T>);
+        let diff_per_axis = self.apply(other, abs_diff::<T>);
         diff_per_axis.into_iter().sum()
     }
 
@@ -195,7 +195,7 @@ mod tests {
     fn manhattan_distance() {
         let cord1 = [-2isize, 4];
         let cord2 = [498, 6];
-        let out = cord1.manhattan_distance(&cord2);
+        let out = cord1.manhattan_distance(cord2);
         assert_eq!(out, 500 + 2);
     }
 

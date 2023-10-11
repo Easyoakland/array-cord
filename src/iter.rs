@@ -215,7 +215,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(next) = self.it.next() {
-            if next.clone().manhattan_distance(&self.it.cord) <= self.it.radius {
+            if next.clone().manhattan_distance(self.it.cord.clone()) <= self.it.radius {
                 return Some(next);
             }
         }
