@@ -4,6 +4,7 @@ use core::{
     ops::{Add, Sub},
 };
 use num_traits::ToPrimitive;
+use std::{clone::Clone, cmp::PartialOrd, fmt::Debug};
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const N: usize, I>(
@@ -128,31 +129,35 @@ where
 
 /// Iterator over the moore neighborhood centered at some [`Cord`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-#[derive(Clone, Debug)]
-pub(crate) struct MooreNeighborhoodIter<I, T, const DIM: usize> {
+#[derive(Clone)]
+pub struct MooreNeighborhoodIter<T, const DIM: usize>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
+{
     /// Iterator of cord offsets from the center
-    iterator: I,
+    pub(crate) iterator: CartesianProduct<num_iter::RangeInclusive<T>, DIM>,
     /// The center cordinate
-    cord: [T; DIM],
+    pub(crate) cord: [T; DIM],
     /// The radius used for size_hints
-    radius: T,
+    pub(crate) radius: T,
 }
 
-impl<I, T, const DIM: usize> MooreNeighborhoodIter<I, T, DIM> {
-    /// Create new moore neighborhood iterator given an iterator of offsets, a center cord, and a radius.
-    pub const fn new(iterator: I, cord: [T; DIM], radius: T) -> Self {
-        Self {
-            iterator,
-            cord,
-            radius,
-        }
+impl<T, const DIM: usize> Debug for MooreNeighborhoodIter<T, DIM>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive + Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MooreNeighborhoodIter")
+            // .field("iterator", &self.iterator)
+            .field("cord", &self.cord)
+            .field("radius", &self.radius)
+            .finish()
     }
 }
 
-impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIter<I, T, DIM>
+impl<T, const DIM: usize> Iterator for MooreNeighborhoodIter<T, DIM>
 where
-    I: Iterator<Item = [T; DIM]>,
-    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
+    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd,
 {
     type Item = [T; DIM];
 
@@ -186,10 +191,8 @@ where
     }
 }
 
-impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<I, T, DIM>
-where
-    I: Iterator<Item = [T; DIM]>,
-    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
+impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<T, DIM> where
+    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd
 {
 }
 

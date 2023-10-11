@@ -36,7 +36,7 @@ where
     /// x c x
     /// x x x
     /// ```
-    fn moore_neighborhood(&self, radius: T) -> Box<dyn ExactSizeIterator<Item = [T; DIM]> + '_>
+    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One;
 
@@ -109,9 +109,9 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
         diff_per_axis.into_iter().sum()
     }
 
-    fn moore_neighborhood(&self, radius: T) -> Box<dyn ExactSizeIterator<Item = [T; DIM]> + '_>
+    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
     where
-        T: Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Zero + One,
+        T: PartialOrd + Clone + ToPrimitive + Zero + One,
     {
         let dim_max = radius.clone() + radius.clone();
 
@@ -119,7 +119,11 @@ impl<T, const DIM: usize> ArrayExt<T, DIM> for [T; DIM] {
             range_inclusive(Zero::zero(), dim_max.clone())
         }));
 
-        Box::new(MooreNeighborhoodIter::new(iterator, self.clone(), radius))
+        MooreNeighborhoodIter {
+            iterator,
+            cord: self.clone(),
+            radius,
+        }
     }
 
     fn neumann_neighborhood(&self, radius: T) -> Box<dyn Iterator<Item = [T; DIM]> + '_>
