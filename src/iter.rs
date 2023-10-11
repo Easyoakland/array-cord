@@ -1,4 +1,4 @@
-use crate::cord::Cord;
+use crate::cord::ArrayExt;
 use core::{
     array,
     ops::{Add, Sub},
@@ -96,18 +96,15 @@ where
         ) -> (usize, Option<usize>) {
             (op(sh1.0, sh2.0), sh1.1.zip(sh2.1).map(|x| op(x.0, x.1)))
         }
-        fn iter_to_array<I: Iterator, const N: usize>(mut it: I) -> [I::Item; N] {
-            array::from_fn(|_| it.next().expect("len match"))
-        }
 
         if N == 0 {
             return (0, Some(0));
         }
 
-        let original_size_hints: [_; N] =
-            iter_to_array(self.original_iters.iter().map(Iterator::size_hint));
-        let next_size_hints: [_; N] =
-            iter_to_array(self.next_val_iters.iter().map(Iterator::size_hint));
+        let original_size_hints =
+            <[usize; N]>::from_iter(self.original_iters.iter().map(Iterator::size_hint));
+        let next_size_hints =
+            <[usize; N]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint));
         let weights: [_; N] = {
             let mut weights: [_; N] = array::from_fn(|_| (0, None));
             weights[N - 1] = (1, Some(1));
@@ -136,14 +133,14 @@ pub(crate) struct MooreNeighborhoodIter<I, T, const DIM: usize> {
     /// Iterator of cord offsets from the center
     iterator: I,
     /// The center cordinate
-    cord: Cord<T, DIM>,
+    cord: [T; DIM],
     /// The radius used for size_hints
     radius: T,
 }
 
 impl<I, T, const DIM: usize> MooreNeighborhoodIter<I, T, DIM> {
     /// Create new moore neighborhood iterator given an iterator of offsets, a center cord, and a radius.
-    pub const fn new(iterator: I, cord: Cord<T, DIM>, radius: T) -> Self {
+    pub const fn new(iterator: I, cord: [T; DIM], radius: T) -> Self {
         Self {
             iterator,
             cord,
@@ -154,19 +151,24 @@ impl<I, T, const DIM: usize> MooreNeighborhoodIter<I, T, DIM> {
 
 impl<I, T, const DIM: usize> Iterator for MooreNeighborhoodIter<I, T, DIM>
 where
-    I: Iterator<Item = Cord<T, DIM>>,
+    I: Iterator<Item = [T; DIM]>,
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
 {
-    type Item = Cord<T, DIM>;
+    type Item = [T; DIM];
 
     fn next(&mut self) -> Option<Self::Item> {
         // Each radius increases number of cells in each dimension by 2 (each extent direction by 1) starting with 1 cell at radius = 1.
         while let Some(cord_offset) = self.iterator.next() {
-            let smallest_neighbor = Cord(self.cord.0.clone().map(|x| x - self.radius.clone()));
-            let new_cord = smallest_neighbor + cord_offset;
+            let smallest_neighbor = self.cord.clone().map(|x| x - self.radius.clone());
+            let new_cord = <[T; DIM] as ArrayExt<T, DIM>>::from_iter(
+                smallest_neighbor
+                    .into_iter()
+                    .zip(cord_offset)
+                    .map(|(x, y)| x + y),
+            );
 
             // Don't add self to neighbor list.
-            if new_cord == self.cord {
+            if new_cord.iter().zip(&self.cord).all(|(x, y)| x == y) {
                 continue;
             }
 
@@ -186,7 +188,7 @@ where
 
 impl<I, T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<I, T, DIM>
 where
-    I: Iterator<Item = Cord<T, DIM>>,
+    I: Iterator<Item = [T; DIM]>,
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive,
 {
 }

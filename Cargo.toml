@@ -10,7 +10,6 @@ default = []
 std = []
 
 [dependencies]
-enum-iterator = "1.4.1"
 num-iter = "0.1.43"
 num-traits = "0.2.15"
 

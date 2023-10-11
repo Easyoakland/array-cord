@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+// #![cfg_attr(not(feature = "std"), no_std)] // TODO re-add after removing Box
 #![deny(clippy::all)]
 #![warn(
     // TODO activate this // missing_docs,
@@ -12,5 +12,4 @@
 #![doc(test(attr(deny(warnings))))]
 
 pub mod cord;
-pub mod dir;
 pub mod iter;
