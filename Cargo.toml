@@ -1,5 +1,5 @@
 [package]
-name = "ndcord"
+name = "array-cord"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,4 +14,4 @@ num-iter = "0.1.43"
 num-traits = "0.2.15"
 
 [dev-dependencies]
-ndcord = { path = ".", features = ["std"] }
+array-cord = { path = ".", features = ["std"] }

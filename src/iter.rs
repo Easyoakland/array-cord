@@ -1,4 +1,4 @@
-use crate::cord::ArrayExt;
+use crate::ArrayCord;
 use core::{
     array,
     ops::{Add, Sub},
@@ -7,16 +7,16 @@ use core::{clone::Clone, cmp::PartialOrd, fmt::Debug, iter::Sum};
 use num_traits::ToPrimitive;
 
 /// Determines next value of products in lexicographic order.
-fn next_product_iter<T, const N: usize, I>(
-    mut current: [T; N],
-    next_val_per_idx: &mut [I; N],
-    reset_per_idx: &[I; N],
-) -> Option<[T; N]>
+fn next_product_iter<T, const DIM: usize, I>(
+    mut current: [T; DIM],
+    next_val_per_idx: &mut [I; DIM],
+    reset_per_idx: &[I; DIM],
+) -> Option<[T; DIM]>
 where
     I: Iterator<Item = T> + Clone,
 {
     // Start at least significant digit first.
-    for i in (0..N).rev() {
+    for i in (0..DIM).rev() {
         // If still new values for idx get next and return.
         if let Some(next) = next_val_per_idx[i].next() {
             current[i] = next;
@@ -32,25 +32,27 @@ where
     None
 }
 
-/// Cartesian product in lexicographical order over `N` iterators.
+/// [Cartesian product](https://en.wikipedia.org/wiki/Cartesian_product) in lexicographical order over multiple iterators.
+///
+/// (highest idx changes fastest)
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
-pub struct CartesianProduct<I, const N: usize>
+pub struct CartesianProduct<I, const DIM: usize>
 where
     I: Iterator,
 {
-    original_iters: [I; N],
-    next_val_iters: [I; N],
-    current: [I::Item; N],
+    original_iters: [I; DIM],
+    next_val_iters: [I; DIM],
+    current: [I::Item; DIM],
 }
 
-impl<I, const N: usize> CartesianProduct<I, N>
+impl<I, const DIM: usize> CartesianProduct<I, DIM>
 where
     I: Iterator + Clone,
 {
     /// # Panics
     /// - If an axis has 0 valid values
-    pub fn new(mut values_per_axis: [I; N]) -> Self {
+    pub fn new(mut values_per_axis: [I; DIM]) -> Self {
         let original_iters = values_per_axis.clone();
         // The length of current is N and so is values per axis. This unwrap should thus never fail unless an empty iterator is used.
         // The values_per_axis are purposefully stepped here so that the lower bound is not repeated.
@@ -73,12 +75,12 @@ where
     }
 }
 
-impl<I, const N: usize> Iterator for CartesianProduct<I, N>
+impl<I, const DIM: usize> Iterator for CartesianProduct<I, DIM>
 where
     I: Iterator + Clone,
     I::Item: Clone,
 {
-    type Item = [I::Item; N];
+    type Item = [I::Item; DIM];
 
     fn next(&mut self) -> Option<Self::Item> {
         self.current = next_product_iter(
@@ -98,18 +100,18 @@ where
             (op(sh1.0, sh2.0), sh1.1.zip(sh2.1).map(|x| op(x.0, x.1)))
         }
 
-        if N == 0 {
+        if DIM == 0 {
             return (0, Some(0));
         }
 
         let original_size_hints =
-            <[usize; N]>::from_iter(self.original_iters.iter().map(Iterator::size_hint));
+            <[usize; DIM]>::from_iter(self.original_iters.iter().map(Iterator::size_hint));
         let next_size_hints =
-            <[usize; N]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint));
-        let weights: [_; N] = {
-            let mut weights: [_; N] = array::from_fn(|_| (0, None));
-            weights[N - 1] = (1, Some(1));
-            for i in (0..(N - 1)).rev() {
+            <[usize; DIM]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint));
+        let weights: [_; DIM] = {
+            let mut weights: [_; DIM] = array::from_fn(|_| (0, None));
+            weights[DIM - 1] = (1, Some(1));
+            for i in (0..(DIM - 1)).rev() {
                 weights[i] = op2(
                     weights[i + 1],
                     original_size_hints[i + 1],
@@ -127,7 +129,7 @@ where
     }
 }
 
-/// Iterator over the moore neighborhood centered at some cord.
+/// Iterator over the [moore neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood) centered at some cord.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone)]
 pub struct MooreNeighborhoodIter<T, const DIM: usize>
@@ -185,7 +187,7 @@ impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<T, DIM> wh
 {
 }
 
-/// Iterator over the neumann neighborhood centered at some cord.
+/// Iterator over the [neumann neighborhood](https://en.wikipedia.org//wiki/Von_Neumann_neighborhood) centered at some cord.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
 pub struct NeumannNeighborhoodIter<T, const DIM: usize>
