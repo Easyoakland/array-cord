@@ -3,8 +3,8 @@ use core::{
     array,
     ops::{Add, Sub},
 };
+use core::{clone::Clone, cmp::PartialOrd, fmt::Debug, iter::Sum};
 use num_traits::ToPrimitive;
-use std::{clone::Clone, cmp::PartialOrd, fmt::Debug, iter::Sum};
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const N: usize, I>(
@@ -146,7 +146,7 @@ impl<T, const DIM: usize> Debug for MooreNeighborhoodIter<T, DIM>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive + Debug,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MooreNeighborhoodIter")
             // .field("iterator", &self.iterator)
             .field("cord", &self.cord)
