@@ -28,20 +28,21 @@ use num_traits::{One, ToPrimitive, Zero};
 ///
 /// Use it with
 /// ```
+/// # #[allow(unused_imports)]
 /// use array_cord::ArrayCord;
 /// ```
 pub trait ArrayCord<T, const DIM: usize>
 where
     Self: Sized,
 {
-    /// Make an array from an iterator of values.
-    /// # Panics
-    /// If there are not `DIM` number of [`Some`] elements from iterator
-    fn from_iter<I: Iterator>(mut it: I) -> [I::Item; DIM] {
-        array::from_fn(|_| {
-            it.next()
-                .expect("iterator length should match array length")
-        })
+    /// Make an array from an iterator of values. [`None`] if not enough values.
+    fn from_iter<I: Iterator>(mut it: I) -> Option<[I::Item; DIM]> {
+        let a = array::from_fn(|_| it.next());
+        if a.iter().any(Option::is_none) {
+            None
+        } else {
+            Some(a.map(|x| x.expect("Checked not None")))
+        }
     }
 
     /// Find the cordinate that coresponds to a given offset where maximum width of each axis is given.
@@ -140,13 +141,13 @@ where
     /// Finds the overall extents for many cord using [`Self::extents`]. Handles empty iterator with [`None`].
     /// # Return
     /// `(min_per_axis, max_per_axis)`
-    fn extents_iter(it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
+    fn extents_from_iter(it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
     where
         T: Ord + Clone;
 }
 impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
     fn apply<O>(self, other: Self, mut func: impl FnMut(T, T) -> O) -> [O; DIM] {
-        Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y)))
+        Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y))).expect("length match")
     }
 
     fn extents(&self, other: &Self) -> (Self, Self)
@@ -158,7 +159,7 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
         (smallest.into(), largest.into())
     }
 
-    fn extents_iter(mut it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
+    fn extents_from_iter(mut it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
     where
         T: Ord + Clone,
     {
@@ -176,7 +177,8 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
 
         let ranges = Self::from_iter(
             core::iter::zip(extents.0, extents.1).map(|x| range_inclusive(x.0, x.1)),
-        );
+        )
+        .expect("length match");
         CartesianProduct::new(ranges)
     }
 
@@ -200,8 +202,10 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
     where
         T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
-        let lower_corner = Self::from_iter(self.into_iter().cloned().map(|x| x - radius.clone()));
-        let upper_corner = Self::from_iter(self.into_iter().cloned().map(|x| x + radius.clone()));
+        let lower_corner = Self::from_iter(self.into_iter().cloned().map(|x| x - radius.clone()))
+            .expect("length match");
+        let upper_corner = Self::from_iter(self.into_iter().cloned().map(|x| x + radius.clone()))
+            .expect("length match");
 
         let iterator = lower_corner.interpolate(&upper_corner);
 

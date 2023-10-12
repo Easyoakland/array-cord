@@ -105,9 +105,11 @@ where
         }
 
         let original_size_hints =
-            <[usize; DIM]>::from_iter(self.original_iters.iter().map(Iterator::size_hint));
+            <[usize; DIM]>::from_iter(self.original_iters.iter().map(Iterator::size_hint))
+                .expect("length match");
         let next_size_hints =
-            <[usize; DIM]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint));
+            <[usize; DIM]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint))
+                .expect("length match");
         let weights: [_; DIM] = {
             let mut weights: [_; DIM] = array::from_fn(|_| (0, None));
             weights[DIM - 1] = (1, Some(1));
