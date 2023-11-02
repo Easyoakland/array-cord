@@ -84,7 +84,7 @@ where
     /// The number of orthogonal moves to reach `other` from `self`.
     fn manhattan_distance(self, other: Self) -> T
     where
-        T: Sum + Sub<Output = T> + PartialOrd + Clone;
+        T: Sum + Sub<Output = T> + PartialOrd;
 
     /// [`MooreNeighborhoodIter`] centered on self.
     ///
@@ -124,7 +124,7 @@ where
     ///  xxx
     ///   x
     /// ```
-    fn neumann_neighborhood<'a>(&'a self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
+    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One;
 
@@ -184,7 +184,7 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
 
     fn manhattan_distance(self, other: Self) -> T
     where
-        T: Sum + Sub<Output = T> + PartialOrd + Clone,
+        T: Sum + Sub<Output = T> + PartialOrd,
     {
         fn abs_diff<T: Sub<Output = T> + PartialOrd>(x: T, y: T) -> T {
             if x >= y {
