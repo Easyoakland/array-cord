@@ -134,7 +134,7 @@ where
 /// Iterator over the [moore neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood) centered at some cord.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone)]
-pub struct MooreNeighborhoodIter<T, const DIM: usize>
+pub struct MooreNeighborhood<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
@@ -146,12 +146,12 @@ where
     pub(crate) radius: T,
 }
 
-impl<T, const DIM: usize> Debug for MooreNeighborhoodIter<T, DIM>
+impl<T, const DIM: usize> Debug for MooreNeighborhood<T, DIM>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive + Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("MooreNeighborhoodIter")
+        f.debug_struct("MooreNeighborhood")
             // .field("iterator", &self.iterator)
             .field("cord", &self.cord)
             .field("radius", &self.radius)
@@ -159,20 +159,17 @@ where
     }
 }
 
-impl<T, const DIM: usize> Iterator for MooreNeighborhoodIter<T, DIM>
+impl<T, const DIM: usize> Iterator for MooreNeighborhood<T, DIM>
 where
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd,
 {
     type Item = [T; DIM];
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(neighbor_or_self) = self.iterator.next() {
-            // Don't add self to neighbor list.
-            if core::iter::zip(&neighbor_or_self, &self.cord).any(|(x, y)| x != y) {
-                return Some(neighbor_or_self);
-            }
-        }
-        None
+        // Don't add self to neighbor list.
+        self.iterator.by_ref().find(|neighbor_or_self| {
+            core::iter::zip(neighbor_or_self, &self.cord).any(|(x, y)| x != y)
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -184,22 +181,20 @@ where
     }
 }
 
-impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<T, DIM> where
+impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhood<T, DIM> where
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd
 {
 }
 
 /// Iterator over the [moore neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood) centered at some cord.
-/// Unlike [`MooreNeighborhoodIter`] skips values not representable as a `T` (e.g. using `0u8` with `radius >= 1`)
+/// Unlike [`MooreNeighborhood`] skips values not representable as a `T` (e.g. using `0u8` with `radius >= 1`)
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Debug, Clone)]
-pub struct BoundedMooreNeighborhoodIter<T, const DIM: usize>(
-    pub(crate) MooreNeighborhoodIter<T, DIM>,
-)
+pub struct BoundedMooreNeighborhood<T, const DIM: usize>(pub(crate) MooreNeighborhood<T, DIM>)
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive;
 
-impl<T, const DIM: usize> Iterator for BoundedMooreNeighborhoodIter<T, DIM>
+impl<T, const DIM: usize> Iterator for BoundedMooreNeighborhood<T, DIM>
 where
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd,
 {
@@ -216,18 +211,18 @@ where
     }
 }
 
-/// Iterator over the [neumann neighborhood](https://en.wikipedia.org//wiki/Von_Neumann_neighborhood) centered at some cord.
+/// Iterator over the [neumann neighborhood](https://en.wikipedia.org/wiki/Von_Neumann_neighborhood) centered at some cord.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
-pub struct NeumannNeighborhoodIter<T, const DIM: usize>
+pub struct NeumannNeighborhood<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
     /// Iterator of cord offsets from the center
-    pub(crate) it: MooreNeighborhoodIter<T, DIM>,
+    pub(crate) it: MooreNeighborhood<T, DIM>,
 }
 
-impl<T, const DIM: usize> Iterator for NeumannNeighborhoodIter<T, DIM>
+impl<T, const DIM: usize> Iterator for NeumannNeighborhood<T, DIM>
 where
     T: Add<Output = T> + Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Sum,
 {

@@ -20,9 +20,7 @@ use core::{
     num::NonZeroUsize,
     ops::{Add, Sub},
 };
-use iter::{
-    BoundedMooreNeighborhoodIter, CartesianProduct, MooreNeighborhoodIter, NeumannNeighborhoodIter,
-};
+use iter::{BoundedMooreNeighborhood, CartesianProduct, MooreNeighborhood, NeumannNeighborhood};
 use num_iter::range_inclusive;
 use num_traits::{Bounded, CheckedAdd, CheckedSub, One, ToPrimitive, Zero};
 
@@ -68,16 +66,15 @@ where
     {
         let mut out = [0; DIM];
         for axis in (0..DIM).rev() {
-            let next_lowest_axis_width = axis.checked_sub(1);
-            out[axis] = match next_lowest_axis_width {
-                Some(x) => offset / widths[x],
-                None => offset,
-            };
-            if next_lowest_axis_width.is_some() {
-                offset -= out[axis] * <usize as From<_>>::from(widths[axis - 1]);
+            if let Some(next_lowest_axis_width) = axis.checked_sub(1) {
+                out[axis] = offset / widths[next_lowest_axis_width];
+                offset -= out[axis] * usize::from(widths[axis - 1]);
             }
         }
-        out.map(Into::into).into()
+        if let Some(x) = out.first_mut() {
+            *x = offset;
+        }
+        out.map(Into::into)
     }
 
     /// Elementwise application of a function on two arrays
@@ -88,7 +85,7 @@ where
     where
         T: Sum + Sub<Output = T> + PartialOrd;
 
-    /// [`MooreNeighborhoodIter`] centered on self.
+    /// [`MooreNeighborhood`] centered on self.
     ///
     /// e.g. with radius `1`:
     /// ```txt
@@ -107,21 +104,21 @@ where
     /// ```
     /// # Panics
     /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
-    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
+    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
 
-    /// Same as [`moore_neighborhood()`] but bounded to within `T`'s range instead of panicking.
+    /// Same as [`Self::moore_neighborhood()`] but bounded to within `T`'s range instead of panicking.
     /// ```
     /// # use array_cord::ArrayCord;
     /// assert_eq!([0u8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[1]]);
     /// assert_eq!([0i8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[-1], [1]]);
     /// ```
-    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhoodIter<T, DIM>
+    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd;
 
-    /// [`NeumannNeighborhoodIter`] centered on self.
+    /// [`NeumannNeighborhood`] centered on self.
     ///
     /// e.g. with radius `1`:
     /// ```txt
@@ -140,23 +137,21 @@ where
     /// ```
     /// # Panics
     /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
-    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
+    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One;
 
-    /// Return an iterator over all points (inclusive) between `self` and `other`. Order is lexicographical.
+    /// Return an iterator over all points (inclusive) between `self` and `other`.
     fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
     where
         T: Add<Output = T> + Ord + Clone + One + ToPrimitive;
 
-    /// Finds the largest value in each dimension and smallest value in each dimension as the pair `(min, max)`.
+    /// Finds the smallest value in each dimension and largest value in each dimension as the pair `(min, max)`.
     fn extents(&self, other: &Self) -> (Self, Self)
     where
         T: Ord + Clone;
 
-    /// Finds the overall extents for many cord using [`Self::extents`]. Handles empty iterator with [`None`].
-    /// # Return
-    /// `(min_per_axis, max_per_axis)`
+    /// Finds the overall extents `(min_per_axis, max_per_axis)` for many cord using [`Self::extents`]. Handles empty iterator with [`None`].
     fn extents_from_iter(it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
     where
         T: Ord + Clone;
@@ -172,7 +167,7 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
     {
         let smallest = array::from_fn(|axis| self[axis].clone().min(other[axis].clone()));
         let largest = array::from_fn(|axis| self[axis].clone().max(other[axis].clone()));
-        (smallest.into(), largest.into())
+        (smallest, largest)
     }
 
     fn extents_from_iter(mut it: impl Iterator<Item = Self>) -> Option<(Self, Self)>
@@ -214,7 +209,7 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
         diff_per_axis.into_iter().sum()
     }
 
-    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
+    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhood<T, DIM>
     where
         T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
@@ -223,14 +218,14 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
 
         let iterator = lower_corner.interpolate(&upper_corner);
 
-        MooreNeighborhoodIter {
+        MooreNeighborhood {
             iterator,
             cord: self.clone(),
             radius,
         }
     }
 
-    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhoodIter<T, DIM>
+    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
     {
@@ -243,18 +238,18 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
 
         let iterator = lower_corner.interpolate(&upper_corner);
 
-        BoundedMooreNeighborhoodIter(MooreNeighborhoodIter {
+        BoundedMooreNeighborhood(MooreNeighborhood {
             iterator,
             cord: self.clone(),
             radius,
         })
     }
 
-    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
+    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One,
     {
-        NeumannNeighborhoodIter {
+        NeumannNeighborhood {
             it: self.moore_neighborhood(radius),
         }
     }
