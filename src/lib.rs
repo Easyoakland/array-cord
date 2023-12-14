@@ -13,7 +13,6 @@
 
 pub mod iter;
 
-use crate::iter::{CartesianProduct, MooreNeighborhoodIter, NeumannNeighborhoodIter};
 use core::{
     array,
     clone::Clone,
@@ -21,8 +20,11 @@ use core::{
     num::NonZeroUsize,
     ops::{Add, Sub},
 };
+use iter::{
+    BoundedMooreNeighborhoodIter, CartesianProduct, MooreNeighborhoodIter, NeumannNeighborhoodIter,
+};
 use num_iter::range_inclusive;
-use num_traits::{One, ToPrimitive, Zero};
+use num_traits::{Bounded, CheckedAdd, CheckedSub, One, ToPrimitive, Zero};
 
 /// An extension trait for working with fixed-length arrays as grid coordinates.
 ///
@@ -103,9 +105,21 @@ where
     /// xxxxx
     /// xxxxx
     /// ```
+    /// # Panics
+    /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
     fn moore_neighborhood(&self, radius: T) -> MooreNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
+
+    /// Same as [`moore_neighborhood()`] but bounded to within `T`'s range instead of panicking.
+    /// ```
+    /// # use array_cord::ArrayCord;
+    /// assert_eq!([0u8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[1]]);
+    /// assert_eq!([0i8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[-1], [1]]);
+    /// ```
+    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhoodIter<T, DIM>
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd;
 
     /// [`NeumannNeighborhoodIter`] centered on self.
     ///
@@ -124,6 +138,8 @@ where
     ///  xxx
     ///   x
     /// ```
+    /// # Panics
+    /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
     fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
     where
         T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One;
@@ -147,7 +163,7 @@ where
 }
 impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
     fn apply<O>(self, other: Self, mut func: impl FnMut(T, T) -> O) -> [O; DIM] {
-        Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y))).expect("length match")
+        Self::from_iter(self.into_iter().zip(other).map(|(x, y)| func(x, y))).expect("DIM len")
     }
 
     fn extents(&self, other: &Self) -> (Self, Self)
@@ -178,7 +194,7 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
         let ranges = Self::from_iter(
             core::iter::zip(extents.0, extents.1).map(|x| range_inclusive(x.0, x.1)),
         )
-        .expect("length match");
+        .expect("DIM len");
         CartesianProduct::new(ranges)
     }
 
@@ -202,10 +218,8 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
     where
         T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
-        let lower_corner = Self::from_iter(self.into_iter().cloned().map(|x| x - radius.clone()))
-            .expect("length match");
-        let upper_corner = Self::from_iter(self.into_iter().cloned().map(|x| x + radius.clone()))
-            .expect("length match");
+        let lower_corner = self.clone().map(|x| x - radius.clone());
+        let upper_corner = self.clone().map(|x| x + radius.clone());
 
         let iterator = lower_corner.interpolate(&upper_corner);
 
@@ -214,6 +228,26 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
             cord: self.clone(),
             radius,
         }
+    }
+
+    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhoodIter<T, DIM>
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
+    {
+        let lower_corner = self
+            .clone()
+            .map(|x| x.checked_sub(&radius).unwrap_or_else(T::min_value));
+        let upper_corner = self
+            .clone()
+            .map(|x| x.checked_add(&radius).unwrap_or_else(T::max_value));
+
+        let iterator = lower_corner.interpolate(&upper_corner);
+
+        BoundedMooreNeighborhoodIter(MooreNeighborhoodIter {
+            iterator,
+            cord: self.clone(),
+            radius,
+        })
     }
 
     fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhoodIter<T, DIM>
@@ -407,6 +441,53 @@ mod tests {
             assert_eq!(<[usize; 3]>::from_offset(1, widths), [0, 1, 0]);
             assert_eq!(<[usize; 3]>::from_offset(2, widths), [0, 0, 1]);
             assert_eq!(<[usize; 3]>::from_offset(3, widths), [0, 1, 1]);
+        }
+    }
+
+    // overflow_checks cfg unstable
+    // see https://github.com/rust-lang/rust/issues/111466, https://users.rust-lang.org/t/detecting-overflow-checks/67698
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic]
+    fn moore_neighborhood_panic_out_of_bounds() {
+        [0u8, 0].moore_neighborhood(1).for_each(drop);
+    }
+
+    // overflow_checks cfg unstable
+    // see https://github.com/rust-lang/rust/issues/111466, https://users.rust-lang.org/t/detecting-overflow-checks/67698
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic]
+    fn neumann_neighborhood_panic_out_of_bounds() {
+        [0u8, 0].neumann_neighborhood(1).for_each(drop);
+    }
+
+    #[test]
+    fn moore_neighborhood_bounded_no_panic_out_of_bounds() {
+        assert_eq!([0u8, 0].moore_neighborhood_bounded(1).count(), 3);
+        assert_eq!([0u8, 1].moore_neighborhood_bounded(1).count(), 5);
+        assert_eq!([0u8, 2].moore_neighborhood_bounded(1).count(), 5);
+        assert_eq!([0u8, 0].moore_neighborhood_bounded(2).count(), 8);
+        assert_eq!([0u8, 1].moore_neighborhood_bounded(2).count(), 11);
+        assert_eq!([0u8, 2].moore_neighborhood_bounded(2).count(), 14);
+        assert_eq!([u8::MAX, 0].moore_neighborhood_bounded(1).count(), 3);
+        assert_eq!([u8::MAX, 1].moore_neighborhood_bounded(1).count(), 5);
+        assert_eq!([0, u8::MAX].moore_neighborhood_bounded(1).count(), 3);
+        assert_eq!([1, u8::MAX].moore_neighborhood_bounded(1).count(), 5);
+    }
+
+    #[test]
+    fn moore_neighborhood_bounded_vs_unbounded() {
+        // Some random numbers that make test fast but cover many cases
+        for x in 150..200u8 {
+            for y in 150..200 {
+                for r in 0..5 {
+                    assert_eq!(
+                        [x, y].moore_neighborhood(r).collect::<Vec<_>>(),
+                        [x, y].moore_neighborhood_bounded(r).collect::<Vec<_>>()
+                    );
+                }
+            }
         }
     }
 }

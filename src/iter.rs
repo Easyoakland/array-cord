@@ -106,10 +106,10 @@ where
 
         let original_size_hints =
             <[usize; DIM]>::from_iter(self.original_iters.iter().map(Iterator::size_hint))
-                .expect("length match");
+                .expect("DIM len");
         let next_size_hints =
             <[usize; DIM]>::from_iter(self.next_val_iters.iter().map(Iterator::size_hint))
-                .expect("length match");
+                .expect("DIM len");
         let weights: [_; DIM] = {
             let mut weights: [_; DIM] = array::from_fn(|_| (0, None));
             weights[DIM - 1] = (1, Some(1));
@@ -155,7 +155,7 @@ where
             // .field("iterator", &self.iterator)
             .field("cord", &self.cord)
             .field("radius", &self.radius)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -187,6 +187,33 @@ where
 impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhoodIter<T, DIM> where
     T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd
 {
+}
+
+/// Iterator over the [moore neighborhood](https://en.wikipedia.org/wiki/Moore_neighborhood) centered at some cord.
+/// Unlike [`MooreNeighborhoodIter`] skips values not representable as a `T` (e.g. using `0u8` with `radius >= 1`)
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug, Clone)]
+pub struct BoundedMooreNeighborhoodIter<T, const DIM: usize>(
+    pub(crate) MooreNeighborhoodIter<T, DIM>,
+)
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive;
+
+impl<T, const DIM: usize> Iterator for BoundedMooreNeighborhoodIter<T, DIM>
+where
+    T: Add<Output = T> + Sub<Output = T> + PartialEq + Clone + ToPrimitive + PartialOrd,
+{
+    type Item = [T; DIM];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Constructed inner type with less neighbors, but iteration logic is same.
+        self.0.next()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Don't know the range of the inner type.
+        // Type could only have 1 valid representation (self) and return no neighbors.
+        (0, self.0.size_hint().1)
+    }
 }
 
 /// Iterator over the [neumann neighborhood](https://en.wikipedia.org//wiki/Von_Neumann_neighborhood) centered at some cord.
