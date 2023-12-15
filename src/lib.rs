@@ -20,7 +20,10 @@ use core::{
     num::NonZeroUsize,
     ops::{Add, Sub},
 };
-use iter::{BoundedMooreNeighborhood, CartesianProduct, MooreNeighborhood, NeumannNeighborhood};
+use iter::{
+    BoundedMooreNeighborhood, BoundedNeumannNeighborhood, CartesianProduct, MooreNeighborhood,
+    NeumannNeighborhood,
+};
 use num_iter::range_inclusive;
 use num_traits::{Bounded, CheckedAdd, CheckedSub, One, ToPrimitive, Zero};
 
@@ -139,7 +142,17 @@ where
     /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
     fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
-        T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One;
+        T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
+
+    /// Same as [`Self::neumann_neighborhood()`] but bounded to within `T`'s range instead of panicking.
+    /// ```
+    /// # use array_cord::ArrayCord;
+    /// assert_eq!([0i8].neumann_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[-1], [1]]);
+    /// assert_eq!([0u8].neumann_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[1]]);
+    /// ```
+    fn neumann_neighborhood_bounded(&self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd;
 
     /// Return an iterator over all points (inclusive) between `self` and `other`.
     fn interpolate(&self, other: &Self) -> CartesianProduct<num_iter::RangeInclusive<T>, DIM>
@@ -247,10 +260,19 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
 
     fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
-        T: Sub<Output = T> + Sum + Ord + Clone + ToPrimitive + Zero + One,
+        T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
         NeumannNeighborhood {
             it: self.moore_neighborhood(radius),
+        }
+    }
+
+    fn neumann_neighborhood_bounded(&self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
+    {
+        BoundedNeumannNeighborhood {
+            it: self.moore_neighborhood_bounded(radius),
         }
     }
 }
@@ -480,6 +502,35 @@ mod tests {
                     assert_eq!(
                         [x, y].moore_neighborhood(r).collect::<Vec<_>>(),
                         [x, y].moore_neighborhood_bounded(r).collect::<Vec<_>>()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn neumann_neighborhood_bounded_no_panic_out_of_bounds() {
+        assert_eq!([0u8, 0].neumann_neighborhood_bounded(1).count(), 2);
+        assert_eq!([0u8, 1].neumann_neighborhood_bounded(1).count(), 3);
+        assert_eq!([0u8, 2].neumann_neighborhood_bounded(1).count(), 3);
+        assert_eq!([0u8, 0].neumann_neighborhood_bounded(2).count(), 5);
+        assert_eq!([0u8, 1].neumann_neighborhood_bounded(2).count(), 7);
+        assert_eq!([0u8, 2].neumann_neighborhood_bounded(2).count(), 8);
+        assert_eq!([u8::MAX, 0].neumann_neighborhood_bounded(1).count(), 2);
+        assert_eq!([u8::MAX, 1].neumann_neighborhood_bounded(1).count(), 3);
+        assert_eq!([0, u8::MAX].neumann_neighborhood_bounded(1).count(), 2);
+        assert_eq!([1, u8::MAX].neumann_neighborhood_bounded(1).count(), 3);
+    }
+
+    #[test]
+    fn neumann_neighborhood_bounded_vs_unbounded() {
+        // Some random numbers that make test fast but cover many cases
+        for x in 150..200u8 {
+            for y in 150..200 {
+                for r in 0..5 {
+                    assert_eq!(
+                        [x, y].neumann_neighborhood(r).collect::<Vec<_>>(),
+                        [x, y].neumann_neighborhood_bounded(r).collect::<Vec<_>>()
                     );
                 }
             }

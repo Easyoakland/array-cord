@@ -218,7 +218,6 @@ pub struct NeumannNeighborhood<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
-    /// Iterator of cord offsets from the center
     pub(crate) it: MooreNeighborhood<T, DIM>,
 }
 
@@ -238,6 +237,38 @@ where
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.it.size_hint().1)
+    }
+}
+
+/// Iterator over the [neumann neighborhood](https://en.wikipedia.org/wiki/Von_Neumann_neighborhood) centered at some cord.
+/// Unlike [`NeumannNeighborhood`] skips values not representable as a `T` (e.g. using `0u8` with `radius >= 1`)
+#[must_use = "iterators are lazy and do nothing unless consumed"]
+#[derive(Debug, Clone)]
+pub struct BoundedNeumannNeighborhood<T, const DIM: usize>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
+{
+    pub(crate) it: BoundedMooreNeighborhood<T, DIM>,
+}
+
+impl<T, const DIM: usize> Iterator for BoundedNeumannNeighborhood<T, DIM>
+where
+    T: Add<Output = T> + Sub<Output = T> + PartialOrd + Clone + ToPrimitive + Sum,
+{
+    type Item = [T; DIM];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(next) = self.it.next() {
+            if next.clone().manhattan_distance(self.it.0.cord.clone()) <= self.it.0.radius {
+                return Some(next);
+            }
+        }
+        None
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Don't know the range of the inner type.
+        // Type could only have 1 valid representation (self) and return no neighbors.
+        (0, self.it.0.size_hint().1)
     }
 }
 
