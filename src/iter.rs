@@ -32,9 +32,7 @@ where
     None
 }
 
-/// [Cartesian product](https://en.wikipedia.org/wiki/Cartesian_product) in lexicographical order over multiple iterators.
-///
-/// (highest idx changes fastest)
+/// [Cartesian product](https://en.wikipedia.org/wiki/Cartesian_product) in lexicographical order (highest idx changes fastest) over multiple iterators.
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Clone, Debug)]
 pub struct CartesianProduct<I, const DIM: usize>
@@ -170,7 +168,7 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MooreNeighborhood")
-            // .field("iterator", &self.iterator)
+            // .field("iterator", &self.iterator) // num_iter::RangeInclusive doesn't implement Debug
             .field("cord", &self.cord)
             .field("radius", &self.radius)
             .finish_non_exhaustive()
@@ -381,5 +379,14 @@ mod tests {
         let nd = CartesianProduct::new(its);
         assert_eq!(nd.size_hint().0, 0);
         assert_eq!(nd.size_hint().1, Some(0));
+    }
+
+    #[test]
+    fn cartesian_product_lexicographic_order() {
+        let mut v = vec![[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]];
+        let res = CartesianProduct::new([0..2, 0..3]).collect::<Vec<_>>();
+        assert_eq!(res, v);
+        v.sort();
+        assert_eq!(res, v);
     }
 }
