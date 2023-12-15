@@ -4,7 +4,7 @@ use core::{
     ops::{Add, Sub},
 };
 use core::{clone::Clone, cmp::PartialOrd, fmt::Debug, iter::Sum};
-use num_traits::ToPrimitive;
+use num_traits::{Bounded, CheckedAdd, CheckedSub, One, ToPrimitive, Zero};
 
 /// Determines next value of products in lexicographic order.
 fn next_product_iter<T, const DIM: usize, I>(
@@ -139,11 +139,29 @@ where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
     /// Iterator of neighbors and self
-    pub(crate) iterator: CartesianProduct<num_iter::RangeInclusive<T>, DIM>,
+    iterator: CartesianProduct<num_iter::RangeInclusive<T>, DIM>,
     /// The center cordinate
-    pub(crate) cord: [T; DIM],
+    cord: [T; DIM],
     /// The radius used for size_hints
-    pub(crate) radius: T,
+    radius: T,
+}
+
+impl<T, const DIM: usize> MooreNeighborhood<T, DIM>
+where
+    T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
+{
+    pub fn new(cord: [T; DIM], radius: T) -> Self {
+        let lower_corner = cord.clone().map(|x| x - radius.clone());
+        let upper_corner = cord.clone().map(|x| x + radius.clone());
+
+        let iterator = lower_corner.interpolate(&upper_corner);
+
+        MooreNeighborhood {
+            iterator,
+            cord,
+            radius,
+        }
+    }
 }
 
 impl<T, const DIM: usize> Debug for MooreNeighborhood<T, DIM>
@@ -190,9 +208,34 @@ impl<T, const DIM: usize> ExactSizeIterator for MooreNeighborhood<T, DIM> where
 /// Unlike [`MooreNeighborhood`] skips values not representable as a `T` (e.g. using `0u8` with `radius >= 1`)
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 #[derive(Debug, Clone)]
-pub struct BoundedMooreNeighborhood<T, const DIM: usize>(pub(crate) MooreNeighborhood<T, DIM>)
+pub struct BoundedMooreNeighborhood<T, const DIM: usize>(MooreNeighborhood<T, DIM>)
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive;
+
+impl<T, const DIM: usize> BoundedMooreNeighborhood<T, DIM>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
+{
+    pub fn new(cord: [T; DIM], radius: T) -> BoundedMooreNeighborhood<T, DIM>
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
+    {
+        let lower_corner = cord
+            .clone()
+            .map(|x| x.checked_sub(&radius).unwrap_or_else(T::min_value));
+        let upper_corner = cord
+            .clone()
+            .map(|x| x.checked_add(&radius).unwrap_or_else(T::max_value));
+
+        let iterator = lower_corner.interpolate(&upper_corner);
+
+        BoundedMooreNeighborhood(MooreNeighborhood {
+            iterator,
+            cord,
+            radius,
+        })
+    }
+}
 
 impl<T, const DIM: usize> Iterator for BoundedMooreNeighborhood<T, DIM>
 where
@@ -218,7 +261,18 @@ pub struct NeumannNeighborhood<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
-    pub(crate) it: MooreNeighborhood<T, DIM>,
+    it: MooreNeighborhood<T, DIM>,
+}
+
+impl<T, const DIM: usize> NeumannNeighborhood<T, DIM>
+where
+    T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
+{
+    pub fn new(cord: [T; DIM], radius: T) -> Self {
+        NeumannNeighborhood {
+            it: MooreNeighborhood::new(cord, radius),
+        }
+    }
 }
 
 impl<T, const DIM: usize> Iterator for NeumannNeighborhood<T, DIM>
@@ -248,7 +302,21 @@ pub struct BoundedNeumannNeighborhood<T, const DIM: usize>
 where
     T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
 {
-    pub(crate) it: BoundedMooreNeighborhood<T, DIM>,
+    it: BoundedMooreNeighborhood<T, DIM>,
+}
+
+impl<T, const DIM: usize> BoundedNeumannNeighborhood<T, DIM>
+where
+    T: Add<Output = T> + PartialOrd + Clone + ToPrimitive,
+{
+    pub fn new(cord: [T; DIM], radius: T) -> Self
+    where
+        T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
+    {
+        BoundedNeumannNeighborhood {
+            it: BoundedMooreNeighborhood::new(cord, radius),
+        }
+    }
 }
 
 impl<T, const DIM: usize> Iterator for BoundedNeumannNeighborhood<T, DIM>
@@ -268,7 +336,7 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         // Don't know the range of the inner type.
         // Type could only have 1 valid representation (self) and return no neighbors.
-        (0, self.it.0.size_hint().1)
+        (0, self.it.size_hint().1)
     }
 }
 

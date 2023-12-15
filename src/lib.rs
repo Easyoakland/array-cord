@@ -107,7 +107,7 @@ where
     /// ```
     /// # Panics
     /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
-    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhood<T, DIM>
+    fn moore_neighborhood(self, radius: T) -> MooreNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
 
@@ -117,7 +117,7 @@ where
     /// assert_eq!([0u8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[1]]);
     /// assert_eq!([0i8].moore_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[-1], [1]]);
     /// ```
-    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
+    fn moore_neighborhood_bounded(self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd;
 
@@ -140,7 +140,7 @@ where
     /// ```
     /// # Panics
     /// If `T` can't represent all the neighbors of `Self` (e.g. overflow/underflow) then this will panic with overflow checks enabled.
-    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
+    fn neumann_neighborhood(self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One;
 
@@ -150,7 +150,7 @@ where
     /// assert_eq!([0i8].neumann_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[-1], [1]]);
     /// assert_eq!([0u8].neumann_neighborhood_bounded(1).collect::<Vec<_>>(), vec![[1]]);
     /// ```
-    fn neumann_neighborhood_bounded(&self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
+    fn neumann_neighborhood_bounded(self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd;
 
@@ -222,58 +222,32 @@ impl<T, const DIM: usize> ArrayCord<T, DIM> for [T; DIM] {
         diff_per_axis.into_iter().sum()
     }
 
-    fn moore_neighborhood(&self, radius: T) -> MooreNeighborhood<T, DIM>
+    fn moore_neighborhood(self, radius: T) -> MooreNeighborhood<T, DIM>
     where
         T: Add<Output = T> + Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
-        let lower_corner = self.clone().map(|x| x - radius.clone());
-        let upper_corner = self.clone().map(|x| x + radius.clone());
-
-        let iterator = lower_corner.interpolate(&upper_corner);
-
-        MooreNeighborhood {
-            iterator,
-            cord: self.clone(),
-            radius,
-        }
+        MooreNeighborhood::new(self, radius)
     }
 
-    fn moore_neighborhood_bounded(&self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
+    fn moore_neighborhood_bounded(self, radius: T) -> BoundedMooreNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
     {
-        let lower_corner = self
-            .clone()
-            .map(|x| x.checked_sub(&radius).unwrap_or_else(T::min_value));
-        let upper_corner = self
-            .clone()
-            .map(|x| x.checked_add(&radius).unwrap_or_else(T::max_value));
-
-        let iterator = lower_corner.interpolate(&upper_corner);
-
-        BoundedMooreNeighborhood(MooreNeighborhood {
-            iterator,
-            cord: self.clone(),
-            radius,
-        })
+        BoundedMooreNeighborhood::new(self, radius)
     }
 
-    fn neumann_neighborhood(&self, radius: T) -> NeumannNeighborhood<T, DIM>
+    fn neumann_neighborhood(self, radius: T) -> NeumannNeighborhood<T, DIM>
     where
         T: Sub<Output = T> + Ord + Clone + ToPrimitive + Zero + One,
     {
-        NeumannNeighborhood {
-            it: self.moore_neighborhood(radius),
-        }
+        NeumannNeighborhood::new(self, radius)
     }
 
-    fn neumann_neighborhood_bounded(&self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
+    fn neumann_neighborhood_bounded(self, radius: T) -> BoundedNeumannNeighborhood<T, DIM>
     where
         T: Ord + Clone + ToPrimitive + Zero + One + Bounded + CheckedSub + CheckedAdd,
     {
-        BoundedNeumannNeighborhood {
-            it: self.moore_neighborhood_bounded(radius),
-        }
+        BoundedNeumannNeighborhood::new(self, radius)
     }
 }
 
